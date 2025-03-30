@@ -16,12 +16,11 @@ class JustB2B_Related_Products
   private $min_value;
   private $max_value;
 
-
   private function __construct()
   {
     $this->related_products = [
-      ['id' => 236, 'min' => 7, 'max' => 20],
-      ['id' => 235, 'min' => 5, 'max' => 30],
+      ['id' => 63, 'min' => 7, 'max' => 20],
+      ['id' => 64, 'min' => 5, 'max' => 30],
     ];
 
     $this->set_min_max_values();
@@ -31,11 +30,14 @@ class JustB2B_Related_Products
     add_action('wp_ajax_nopriv_justb2b_update_related_products', [$this, 'update_related_products']);
     add_action('wp_footer', [$this, 'enqueue_scripts']);
     add_filter('woocommerce_quantity_input_args', [$this, 'enforce_min_quantity'], 10, 2);
-    add_action('woocommerce_before_calculate_totals', [$this, 'validate_cart_quantities']);
-
     add_filter('woocommerce_add_cart_item_data', [$this, 'add_related_product_to_cart'], 10, 2);
     add_filter('woocommerce_get_item_data', [$this, 'display_related_product_in_cart'], 10, 2);
     add_action('woocommerce_before_calculate_totals', [$this, 'update_cart_item_price'], 20, 1);
+  }
+
+  private function is_test_category_product($product_id): bool
+  {
+    return has_term('test', 'product_cat', $product_id);
   }
 
   public static function get_instance()
@@ -64,43 +66,6 @@ class JustB2B_Related_Products
     $this->max_value = (!empty($maxValues)) ? max($maxValues) : null;
   }
 
-  public function generate_related_products_html($quantity, $selected_option = null)
-  {
-    $html = '<p><strong>Choose an option:</strong></p><div id="justb2b_related_products_list" style="display: flex; flex-wrap: wrap; gap: 10px;">';
-    $hasProducts = false;
-    $firstProductId = null;
-    $optionsHtml = '';
-
-    foreach ($this->related_products as $related) {
-      if (($related['min'] === null || $quantity >= $related['min']) && ($related['max'] === null || $quantity <= $related['max'])) {
-        $related_product = wc_get_product($related['id']);
-        if ($related_product) {
-          $hasProducts = true;
-          if (!$firstProductId) {
-            $firstProductId = $related['id'];
-          }
-
-          $checked = ($selected_option == $related['id']) || (!$selected_option && $firstProductId == $related['id']) ? 'checked' : '';
-          $optionsHtml .= sprintf(
-            '<label style="display: flex; align-items: center; gap: 5px; border: 1px solid #ccc; padding: 5px; cursor: pointer; width: 200px;">
-                            <input type="radio" name="extra_option" value="%d" %s>
-                            <img src="%s" alt="%s" width="40" height="40" style="border-radius: 5px;">
-                            <span>%s - %s</span>
-                        </label>',
-            $related['id'],
-            $checked,
-            esc_url(get_the_post_thumbnail_url($related['id'], 'thumbnail') ?: wc_placeholder_img_src()),
-            esc_attr($related_product->get_name()),
-            esc_html($related_product->get_name()),
-            wc_price($related_product->get_price())
-          );
-        }
-      }
-    }
-
-    return $hasProducts ? $html . $optionsHtml . '</div>' : '';
-  }
-
   public function display_related_products()
   {
     global $product;
@@ -108,25 +73,65 @@ class JustB2B_Related_Products
       return;
 
     echo '<div id="justb2b_related_products_container" data-product-id="' . esc_attr($product->get_id()) . '">';
-    echo $this->generate_related_products_html($this->min_value, null);
+    echo $this->generate_related_products_html($product->get_id(), isset($_POST['quantity']) ? absint($_POST['quantity']) : $this->min_value, null);
     echo '</div>';
   }
 
-  public function update_related_products()
+  public function generate_related_products_html($product_id, $quantity, $selected_option = null)
   {
-    check_ajax_referer('justb2b_nonce', 'nonce');
-    $quantity = isset($_POST['qty']) ? intval($_POST['qty']) : $this->min_value;
-    $selected_option = isset($_POST['selected_option']) ? intval($_POST['selected_option']) : null;
-    wp_send_json_success(['html' => $this->generate_related_products_html($quantity, $selected_option)]);
+    $hasProducts = false;
+    if ($this->is_test_category_product( $product_id)) {
+      $html = '<fieldset id="justb2b_related_products_list" style="display: flex; flex-wrap: wrap; gap: 10px; border: none; padding: 0;">
+        <legend><strong>' . esc_html__('Choose an option:', 'justb2b') . '</strong></legend>';
+
+      $firstProductId = null;
+      $optionsHtml = '';
+
+      foreach ($this->related_products as $related) {
+        if (($related['min'] === null || $quantity >= $related['min']) && ($related['max'] === null || $quantity <= $related['max'])) {
+          $related_product = wc_get_product($related['id']);
+          if ($related_product) {
+            $hasProducts = true;
+            if (!$firstProductId) {
+              $firstProductId = $related['id'];
+            }
+
+            $checked = ($selected_option == $related['id']) || (!$selected_option && $firstProductId == $related['id']) ? 'checked' : '';
+            $input_id = 'extra_option_' . $related['id'];
+
+            $optionsHtml .= sprintf(
+              '<label for="%1$s" style="display: flex; align-items: center; gap: 5px; border: 1px solid #ccc; padding: 5px; cursor: pointer; width: 200px;">
+                  <input type="radio" id="%1$s" name="extra_option" value="%2$d" %3$s>
+                  <img src="%4$s" alt="%5$s" width="40" height="40" style="border-radius: 5px;">
+                  <span>%5$s - %6$s</span>
+              </label>',
+              esc_attr($input_id),
+              $related['id'],
+              $checked,
+              esc_url(get_the_post_thumbnail_url($related['id'], 'thumbnail') ?: wc_placeholder_img_src()),
+              esc_attr($related_product->get_name()),
+              wc_price($related_product->get_price())
+            );
+          }
+        }
+      }
+
+      $html .= $optionsHtml . '</fieldset>';
+    }
+
+    return $hasProducts ? $html : '';
   }
 
   public function enqueue_scripts()
   {
     if (!is_product())
       return;
+
+    $quantities = range($this->min_value, $this->max_value ?? $this->min_value);
     ?>
     <script>
-      jQuery(document).ready(function () {
+      jQuery(document).ready(function ($) {
+        const quantities = <?php echo json_encode($quantities); ?>;
         const Selectors = {
           qtyInput: ".cart .quantity input.qty",
           relatedProductsContainer: "#justb2b_related_products_container",
@@ -134,40 +139,83 @@ class JustB2B_Related_Products
           radioInputs: "input[name='extra_option']",
         };
 
+        // Create buttons dynamically
+        const buttonContainer = $('<div class="quantity-buttons"></div>');
+        $.each(quantities, function (index, qty) {
+          const button = $('<button class="qty-button" type="button">' + qty + ' ml</button>');
+          button.data('quantity', qty);
+          buttonContainer.append(button);
+        });
+
+        // Insert buttons after quantity input
+        const quantityInput = $(Selectors.qtyInput);
+        if (quantityInput.length) {
+          quantityInput.parent().parent().append(buttonContainer);
+        }
+
+        // Handle button click to set quantity
+        $('.qty-button').on('click', function () {
+          const selectedQty = $(this).data('quantity');
+          quantityInput.val(selectedQty).trigger('change');
+        });
+
+        // Highlight active button
+        function handleQuantityChange(quantity) {
+          let buttonActivated = false;
+          $('.qty-button').each(function () {
+            const buttonQty = $(this).data('quantity');
+            if (buttonQty === quantity) {
+              $(this).addClass('active');
+              buttonActivated = true;
+            } else {
+              $(this).removeClass('active');
+            }
+          });
+          if (!buttonActivated) {
+            $('.qty-button').removeClass('active');
+          }
+        }
+
+        quantityInput.on('change', function () {
+          const qtyValue = parseInt($(this).val(), 10);
+          handleQuantityChange(qtyValue);
+        });
+
+        handleQuantityChange(quantities[0]);
+
+        // Existing logic for related products
         let isRequestInProgress = false;
-
         function updateRelatedProducts() {
-          const $qtyInput = jQuery(Selectors.qtyInput);
-          const quantity = $qtyInput.length ? parseInt($qtyInput.val(), 10) : 1;
-          const $relatedContainer = jQuery(Selectors.relatedProductsContainer);
+          const quantity = quantityInput.length ? parseInt(quantityInput.val(), 10) : 1;
+          const $relatedContainer = $(Selectors.relatedProductsContainer);
+          const productId = parseInt($relatedContainer.data("product-id"), 10);
+          const selectedOption = $(Selectors.radioInputs + ":checked").val() || null;
 
-          if (isRequestInProgress || quantity < 1) return;
+          if (isRequestInProgress || quantity < 1 || !productId) return;
 
           isRequestInProgress = true;
-          const selectedOption = jQuery(Selectors.radioInputs + ":checked").val() || null;
+          $(Selectors.radioContainer).css("opacity", "0.5").css("pointer-events", "none");
 
-          jQuery(Selectors.radioContainer).css("opacity", "0.5").css("pointer-events", "none");
-
-          jQuery.ajax({
+          $.ajax({
             url: "<?php echo esc_url(admin_url('admin-ajax.php')); ?>",
             method: "POST",
             data: {
               action: "justb2b_update_related_products",
               nonce: "<?php echo wp_create_nonce('justb2b_nonce'); ?>",
               qty: quantity,
+              product_id: productId,
               selected_option: selectedOption,
             },
           })
             .done(function (response) {
               if (response.success) {
                 $relatedContainer.html(response.data.html);
-
                 setTimeout(() => {
-                  const newSelectedOption = jQuery(Selectors.radioInputs + "[value='" + selectedOption + "']");
+                  const newSelectedOption = $(Selectors.radioInputs + "[value='" + selectedOption + "']");
                   if (newSelectedOption.length) {
                     newSelectedOption.prop("checked", true);
                   } else {
-                    jQuery(Selectors.radioInputs).first().prop("checked", true);
+                    $(Selectors.radioInputs).first().prop("checked", true);
                   }
                 }, 100);
               } else {
@@ -180,36 +228,48 @@ class JustB2B_Related_Products
             .always(function () {
               isRequestInProgress = false;
               setTimeout(() => {
-                jQuery(Selectors.radioContainer).css("opacity", "1").css("pointer-events", "auto");
+                $(Selectors.radioContainer).css("opacity", "1").css("pointer-events", "auto");
               }, 300);
             });
         }
 
-        function debounce(func, delay) {
+        const debounce = (func, delay) => {
           let timer;
           return function (...args) {
             clearTimeout(timer);
             timer = setTimeout(() => func.apply(this, args), delay);
           };
-        }
+        };
 
-        const debouncedUpdateRelatedProducts = debounce(updateRelatedProducts, 500);
-
-        function initializeEventListeners() {
-          jQuery(document.body).on("input change", Selectors.qtyInput, debouncedUpdateRelatedProducts);
-        }
-
-        initializeEventListeners();
+        const debouncedUpdate = debounce(updateRelatedProducts, 500);
+        $(document.body).on("input change", Selectors.qtyInput, debouncedUpdate);
       });
     </script>
+    <style>
+      .quantity-buttons {
+        margin-top: 10px;
+      }
+
+      .qty-button {
+        margin: 3px;
+        padding: 5px 10px;
+        border: 1px solid #ccc;
+        cursor: pointer;
+        background-color: #f8f8f8;
+      }
+
+      .qty-button.active {
+        background-color: #333;
+        color: #fff;
+      }
+    </style>
     <?php
   }
 
   public function enforce_min_quantity($args, $product)
   {
-    if (has_term('test', 'product_cat', $product->get_id())) {
+    if ($this->is_test_category_product( $product->get_id())) {
       $args['min_value'] = $this->min_value;
-      // $args['input_value'] = $this->min_value;
       if ($this->max_value) {
         $args['max_value'] = $this->max_value;
       }
@@ -217,40 +277,50 @@ class JustB2B_Related_Products
     return $args;
   }
 
-  public function validate_cart_quantities($cart)
-  {
-    if (is_admin() && !defined('DOING_AJAX'))
-      return;
-    foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
-      $product = $cart_item['data'];
-      if (has_term('test', 'product_cat', $product->get_id()) && $cart_item['quantity'] < $this->min_value) {
-        $cart->set_quantity($cart_item_key, $this->min_value);
-      }
-    }
-  }
-
-
   public function add_related_product_to_cart($cart_item_data, $product_id)
   {
     $main_product = wc_get_product($product_id);
-    if (!has_term('test', 'product_cat', $main_product->get_id())) {
+    if (!$this->is_test_category_product( $main_product->get_id())) {
       return $cart_item_data;
     }
 
-    if (isset($_POST['extra_option']) && !empty($_POST['extra_option'])) {
-      $related_product_id = intval($_POST['extra_option']);
-    }
-    else {
-      $related_product_id = $this->related_products[0]['id'];
+    $cart_item_data['individual_id'] = uniqid();
+    $locked_quantity = isset($_POST['quantity']) ? absint($_POST['quantity']) : 1;
+    $cart_item_data['locked_quantity'] = $locked_quantity;
+
+    if ($main_product->managing_stock()) {
+      $stock_qty = $main_product->get_stock_quantity();
+      if ($stock_qty < $locked_quantity) {
+        wc_add_notice(sprintf(__('Not enough stock for "%s". Available: %d, Requested: %d.', 'justb2b'), $main_product->get_name(), $stock_qty, $locked_quantity), 'error');
+        return false;
+      }
+    } elseif (!$main_product->is_in_stock()) {
+      wc_add_notice(sprintf(__('"%s" is out of stock.', 'justb2b'), $main_product->get_name()), 'error');
+      return false;
     }
 
+    $related_product_id = isset($_POST['extra_option']) ? absint($_POST['extra_option']) : $this->related_products[0]['id'];
     $related_product = wc_get_product($related_product_id);
 
-    if ($related_product) {
-      $cart_item_data['extra_product_id'] = $related_product_id;
-      $cart_item_data['extra_product_name'] = $related_product->get_name();
-      $cart_item_data['extra_product_price'] = $related_product->get_price();
+    if (!$related_product || !$related_product->is_in_stock()) {
+      foreach ($this->related_products as $related) {
+        $fallback = wc_get_product($related['id']);
+        if ($fallback && $fallback->is_in_stock()) {
+          $related_product_id = $related['id'];
+          $related_product = $fallback;
+          break;
+        }
+      }
+
+      if (!$related_product || !$related_product->is_in_stock()) {
+        wc_add_notice(__('No valid related product available.', 'justb2b'), 'error');
+        return false;
+      }
     }
+
+    $cart_item_data['extra_product_id'] = $related_product_id;
+    $cart_item_data['extra_product_name'] = $related_product->get_name();
+    $cart_item_data['extra_product_price'] = $related_product->get_price();
 
     return $cart_item_data;
   }
@@ -263,21 +333,53 @@ class JustB2B_Related_Products
         'value' => esc_html($cart_item['extra_product_name']),
       ];
     }
-
     return $item_data;
+  }
+
+  public function update_related_products()
+  {
+    check_ajax_referer('justb2b_nonce', 'nonce');
+
+    $quantity = isset($_POST['qty']) ? max(1, absint($_POST['qty'])) : $this->min_value;
+    $product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : null;
+    $selected_option = isset($_POST['selected_option']) ? absint($_POST['selected_option']) : null;
+
+    if (!$product_id || $quantity < 1) {
+      wp_send_json_error([
+        'html' => '<p>' . esc_html__('Invalid product or quantity.', 'justb2b') . '</p>'
+      ]);
+    }
+
+    $html = $this->generate_related_products_html($product_id, $quantity, $selected_option);
+    if (empty($html)) {
+      wp_send_json_error([
+        'html' => '<p>' . esc_html__('No valid related products found.', 'justb2b') . '</p>'
+      ]);
+    }
+
+    wp_send_json_success(['html' => $html]);
   }
 
   public function update_cart_item_price($cart)
   {
-    if (is_admin() && !defined('DOING_AJAX')) {
+    if (is_admin() && !defined('DOING_AJAX'))
       return;
-    }
 
-    foreach ($cart->get_cart() as $cart_item) {
+    foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+      if (isset($cart_item['locked_quantity'])) {
+        $locked_qty = intval($cart_item['locked_quantity']);
+        if ($cart_item['quantity'] !== $locked_qty) {
+          $cart->set_quantity($cart_item_key, $locked_qty, false);
+        }
+      }
+
       if (isset($cart_item['extra_product_price'])) {
         $quantity = $cart_item['quantity'];
-        $additional_price = $cart_item['extra_product_price'] / $quantity;
-        $cart_item['data']->set_price($cart_item['data']->get_price() + $additional_price);
+        if ($quantity > 0) {
+          $additional_price = $cart_item['extra_product_price'] / $quantity;
+          $original_price = $cart_item['data']->get_price();
+          $cart_item['data']->set_price($original_price + $additional_price);
+        }
       }
     }
   }
