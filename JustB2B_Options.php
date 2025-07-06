@@ -277,6 +277,7 @@ class JustB2B_Related_Products
     {
         if ($this->is_test_category_product($product->get_id())) {
             $args['min_value'] = $this->min_value;
+            $args['input_value']  = $this->min_value;
             if ($this->max_value) {
                 $args['max_value'] = $this->max_value;
             }
