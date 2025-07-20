@@ -29,7 +29,7 @@ class JustB2B_Related_Products {
 		add_action( 'wp_ajax_nopriv_justb2b_update_related_products', [ $this, 'update_related_products' ] );
 		add_action( 'wp_footer', [ $this, 'enqueue_scripts' ] );
 		add_filter( 'woocommerce_quantity_input_args', [ $this, 'enforce_min_quantity' ], 10, 2 );
-		add_filter( 'woocommerce_loop_add_to_cart_link', [ $this, 'enforce_quantity' ], 10, 2 );
+		add_filter( 'woocommerce_loop_add_to_cart_link', [ $this, 'tnl_custom_enforce_qty' ], 10, 3 );
 
 		// Store extra product selection
 		add_filter( 'woocommerce_add_cart_item_data', [ $this, 'capture_extra_option' ], 10, 3 );
@@ -276,13 +276,23 @@ class JustB2B_Related_Products {
 		return $args;
 	}
 
-	public function enforce_quantity( $args, $product ) {
+	public function tnl_custom_enforce_qty( $button, $product, $args ) {
 		$product_id = $product->get_id();
+
+		// Example logic: enforce quantity for "test category" products
 		if ( $this->is_test_category_product( $product_id ) ) {
 			$min_max = $this->get_min_max_values( $product_id );
-			$args['quantity'] = $min_max['min'];
+			$qty = $min_max['min'];
+
+			// Replace data-quantity in the HTML
+			// $button = preg_replace(
+			// 	'/data-quantity="\d+"/',
+			// 	'data-quantity="' . esc_attr( $qty ) . '"',
+			// 	$button
+			// );
 		}
-		return $args;
+
+		return $button;
 	}
 
 	public function capture_extra_option( $cart_item_data, $product_id, $variation_id ) {
