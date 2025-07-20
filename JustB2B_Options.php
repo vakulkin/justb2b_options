@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JustB2B Options
  * Description: Adds related product options as radio buttons on WooCommerce product pages and applies extra product prices as fees.
- * Version: 2.1.0
+ * Version: 2.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -16,8 +16,8 @@ class JustB2B_Related_Products {
 
 	private function __construct() {
 		$this->related_products = [ 
-			[ 'id' => 63, 'min' => 2, 'max' => 15, 'free' => 3 ],
-			[ 'id' => 64, 'min' => 16, 'max' => 30 ],
+			// [ 'id' => 63, 'min' => 2, 'max' => 15, 'free' => 3 ],
+			// [ 'id' => 64, 'min' => 16, 'max' => 30 ],
 			[ 'id' => 1944, 'min' => 2, 'max' => 15, 'free' => 5 ],
 			[ 'id' => 1945, 'min' => 16, 'max' => 30, 'free' => 16 ],
 			[ 'id' => 1947, 'min' => 2, 'max' => 25 ],
@@ -29,7 +29,9 @@ class JustB2B_Related_Products {
 		add_action( 'wp_ajax_nopriv_justb2b_update_related_products', [ $this, 'update_related_products' ] );
 		add_action( 'wp_footer', [ $this, 'enqueue_scripts' ] );
 		add_filter( 'woocommerce_quantity_input_args', [ $this, 'enforce_min_quantity' ], 10, 2 );
-		add_filter( 'woocommerce_loop_add_to_cart_link', [ $this, 'tnl_custom_enforce_qty' ], 9999, 3 );
+
+		// Validate and enforce min quantity
+		add_filter( 'woocommerce_add_to_cart_validation', [ $this, 'enforce_min_qty_on_add_to_cart' ], 10, 3 );
 
 		// Store extra product selection
 		add_filter( 'woocommerce_add_cart_item_data', [ $this, 'capture_extra_option' ], 10, 3 );
@@ -39,6 +41,9 @@ class JustB2B_Related_Products {
 
 		// Display extra product name in cart
 		add_filter( 'woocommerce_get_item_data', [ $this, 'display_extra_in_cart' ], 10, 2 );
+
+		// Adjust cart quantities if needed
+		add_action( 'woocommerce_before_calculate_totals', [ $this, 'adjust_cart_quantities' ], 20 );
 	}
 
 	public static function get_instance() {
@@ -97,8 +102,8 @@ class JustB2B_Related_Products {
 
 		$valid_ids = [];
 		foreach ( $this->related_products as $related ) {
-			if ( ( $related['min'] === null || $quantity >= $related['min'] ) &&
-				( $related['max'] === null || $quantity <= $related['max'] ) ) {
+			if ( ( empty( $related['min'] ) || $quantity >= $related['min'] ) &&
+				( empty( $related['max'] ) || $quantity <= $related['max'] ) ) {
 				$valid_ids[] = $related['id'];
 			}
 		}
@@ -276,28 +281,33 @@ class JustB2B_Related_Products {
 		return $args;
 	}
 
-	public function tnl_custom_enforce_qty( $button, $product, $args ) {
-		$product_id = $product->get_id();
-
-		// Example logic: enforce quantity for "test category" products
+	public function enforce_min_qty_on_add_to_cart( $passed, $product_id, $quantity ) {
 		if ( $this->is_test_category_product( $product_id ) ) {
 			$min_max = $this->get_min_max_values( $product_id );
-			$qty = $min_max['min'];
-
-			// Replace data-quantity in the HTML
-			// $button = preg_replace(
-			// 	'/data-quantity="\d+"/',
-			// 	'data-quantity="' . esc_attr( $qty ) . '"',
-			// 	$button
-			// );
+			if ( $quantity < $min_max['min'] ) {
+				$_REQUEST['quantity'] = $min_max['min']; // Ensure WooCommerce sets correct quantity
+			}
 		}
-
-		return $button;
+		return $passed;
 	}
 
 	public function capture_extra_option( $cart_item_data, $product_id, $variation_id ) {
-		if ( isset( $_POST['extra_option'] ) ) {
-			$cart_item_data['justb2b_extra_option'] = absint( $_POST['extra_option'] );
+		if ( $this->is_test_category_product( $product_id ) ) {
+			$quantity = isset( $_POST['quantity'] ) ? absint( $_POST['quantity'] ) : 1;
+			$valid_ids = [];
+
+			foreach ( $this->related_products as $related ) {
+				if ( ( empty( $related['min'] ) || $quantity >= $related['min'] ) &&
+				     ( empty( $related['max'] ) || $quantity <= $related['max'] ) ) {
+					$valid_ids[] = $related['id'];
+				}
+			}
+
+			if ( isset( $_POST['extra_option'] ) && in_array( absint( $_POST['extra_option'] ), $valid_ids, true ) ) {
+				$cart_item_data['justb2b_extra_option'] = absint( $_POST['extra_option'] );
+			} elseif ( ! empty( $valid_ids ) ) {
+				$cart_item_data['justb2b_extra_option'] = $valid_ids[0];
+			}
 		}
 		return $cart_item_data;
 	}
@@ -315,7 +325,6 @@ class JustB2B_Related_Products {
 					$price = (float) $extra_product->get_price();
 					$qty = $cart_item['quantity'];
 
-					// Apply "free" threshold only if qty condition is met
 					foreach ( $this->related_products as $rel ) {
 						if ( $rel['id'] == $extra_id && isset( $rel['free'] ) && $qty >= $rel['free'] ) {
 							$price = 0;
@@ -323,7 +332,6 @@ class JustB2B_Related_Products {
 						}
 					}
 
-					// Add fee **only once per cart item**, not multiplied by quantity
 					if ( $price > 0 ) {
 						$fee_name = sprintf( __( 'Флакон %s', 'justb2b' ), $cart_item['data']->get_name() );
 						$cart->add_fee( $fee_name, $price );
@@ -365,6 +373,18 @@ class JustB2B_Related_Products {
 		}
 
 		wp_send_json_success( [ 'html' => $html ] );
+	}
+
+	public function adjust_cart_quantities( $cart ) {
+		foreach ( $cart->get_cart() as $cart_item_key => $cart_item ) {
+			$product_id = $cart_item['product_id'];
+			if ( $this->is_test_category_product( $product_id ) ) {
+				$min_max = $this->get_min_max_values( $product_id );
+				if ( $cart_item['quantity'] < $min_max['min'] ) {
+					$cart->set_quantity( $cart_item_key, $min_max['min'] );
+				}
+			}
+		}
 	}
 }
 
