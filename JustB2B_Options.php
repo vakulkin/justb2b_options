@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: JustB2B Options
- * Description: Adds related product options as radio buttons on WooCommerce product pages.
- * Version: 1.1.0
+ * Description: Adds related product options as radio buttons on WooCommerce product pages and applies extra product prices as fees.
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -29,9 +29,15 @@ class JustB2B_Related_Products {
 		add_action( 'wp_ajax_nopriv_justb2b_update_related_products', [ $this, 'update_related_products' ] );
 		add_action( 'wp_footer', [ $this, 'enqueue_scripts' ] );
 		add_filter( 'woocommerce_quantity_input_args', [ $this, 'enforce_min_quantity' ], 10, 2 );
-		add_filter( 'woocommerce_add_cart_item_data', [ $this, 'add_related_product_to_cart' ], 10, 2 );
-		add_filter( 'woocommerce_get_item_data', [ $this, 'display_related_product_in_cart' ], 10, 2 );
-		add_action( 'woocommerce_before_calculate_totals', [ $this, 'update_cart_item_price' ], 20 );
+
+		// Store extra product selection
+		add_filter( 'woocommerce_add_cart_item_data', [ $this, 'capture_extra_option' ], 10, 3 );
+
+		// Add extra product price as a fee
+		add_action( 'woocommerce_cart_calculate_fees', [ $this, 'add_extra_product_fee' ] );
+
+		// Display extra product name in cart
+		add_filter( 'woocommerce_get_item_data', [ $this, 'display_extra_in_cart' ], 10, 2 );
 	}
 
 	public static function get_instance() {
@@ -269,64 +275,87 @@ class JustB2B_Related_Products {
 		return $args;
 	}
 
-	public function add_related_product_to_cart( $cart_item_data, $product_id ) {
-		if ( ! $this->is_test_category_product( $product_id ) ) {
-			return $cart_item_data;
+	public function capture_extra_option( $cart_item_data, $product_id, $variation_id ) {
+		if ( isset( $_POST['extra_option'] ) ) {
+			$cart_item_data['justb2b_extra_option'] = absint( $_POST['extra_option'] );
 		}
-
-		$cart_item_data['individual_id'] = uniqid();
-		$locked_qty = isset( $_POST['quantity'] ) ? absint( $_POST['quantity'] ) : 1;
-		$cart_item_data['locked_quantity'] = $locked_qty;
-
-		$related_id = isset( $_POST['extra_option'] ) ? absint( $_POST['extra_option'] ) : $this->related_products[0]['id'];
-		$related = wc_get_product( $related_id );
-
-		if ( ! $related || ! $related->is_in_stock() ) {
-			foreach ( $this->related_products as $rp ) {
-				$fallback = wc_get_product( $rp['id'] );
-				if ( $fallback && $fallback->is_in_stock() ) {
-					$related = $fallback;
-					break;
-				}
-			}
-		}
-
-		if ( ! $related || ! $related->is_in_stock() ) {
-			wc_add_notice( __( 'No valid related product available.', 'justb2b' ), 'error' );
-			return false;
-		}
-
-		$cart_item_data['extra_product_id'] = $related->get_id();
 		return $cart_item_data;
 	}
 
-	public function display_related_product_in_cart( $item_data, $cart_item ) {
-		if ( isset( $cart_item['extra_product_id'], $cart_item['quantity'] ) ) {
-			$product = wc_get_product( $cart_item['extra_product_id'] );
-			if ( ! $product ) {
-				return $item_data;
+	public function add_extra_product_fee( $cart ) {
+		if ( is_admin() && ! defined( 'DOING_AJAX' ) )
+			return;
+
+		foreach ( $cart->get_cart() as $cart_item ) {
+			$product_id = $cart_item['product_id'];
+			$qty = $cart_item['quantity'];
+
+			if ( ! $this->is_test_category_product( $product_id ) ) {
+				continue;
 			}
 
-			$name = $product->get_name();
-			$quantity = $cart_item['quantity'];
-			$is_free = false;
+			// Check if the user selected an extra product
+			$selected_extra_id = isset( $cart_item['justb2b_extra_option'] ) ? (int) $cart_item['justb2b_extra_option'] : null;
+			$selected_extra = null;
 
-			foreach ( $this->related_products as $related ) {
-				if ( $related['id'] === $cart_item['extra_product_id'] ) {
-					if ( isset( $related['free'] ) && $quantity >= $related['free'] ) {
-						$is_free = true;
+			// Validate the selected extra product
+			if ( $selected_extra_id ) {
+				foreach ( $this->related_products as $related ) {
+					$min = $related['min'] ?? 1;
+					$max = $related['max'] ?? PHP_INT_MAX;
+
+					if ( $related['id'] === $selected_extra_id && $qty >= $min && $qty <= $max ) {
+						$selected_extra = $related;
+						break;
 					}
-					break;
 				}
 			}
 
-			$price = strip_tags( wc_price( $is_free ? 0 : $product->get_price() ) );
-			$name .= ' - ' . $price;
+			// If selected extra is not valid, find the first valid product
+			if ( ! $selected_extra ) {
+				foreach ( $this->related_products as $related ) {
+					$min = $related['min'] ?? 1;
+					$max = $related['max'] ?? PHP_INT_MAX;
 
-			$item_data[] = [ 
-				'name' => "Флакон",
-				'value' => esc_html( $name ),
-			];
+					if ( $qty >= $min && $qty <= $max ) {
+						$selected_extra = $related;
+						break;
+					}
+				}
+			}
+
+			if ( ! $selected_extra ) {
+				continue; // No valid extra product
+			}
+
+			$extra_product = wc_get_product( $selected_extra['id'] );
+			if ( ! $extra_product ) {
+				continue;
+			}
+
+			// Determine fee
+			$price = (float) $extra_product->get_price();
+			if ( isset( $selected_extra['free'] ) && $qty >= $selected_extra['free'] ) {
+				$price = 0;
+			}
+
+			if ( $price > 0 ) {
+				$fee_name = sprintf( __( 'Флакон for %s', 'justb2b' ), $cart_item['data']->get_name() );
+				$cart->add_fee( $fee_name, $price );
+			}
+		}
+	}
+
+	public function display_extra_in_cart( $item_data, $cart_item ) {
+		if ( isset( $cart_item['justb2b_extra_option'] ) ) {
+			$extra_id = $cart_item['justb2b_extra_option'];
+			$product = wc_get_product( $extra_id );
+			// if ( $product ) {
+			// 	$item_data[] = [ 
+			// 		'name' => __( 'Extra Bottle', 'justb2b' ),
+			// 		'value' => $product->get_name() . ' (' . wc_price( $product->get_price() ) . ')',
+			// 	];
+			// }
 		}
 		return $item_data;
 	}
@@ -350,41 +379,6 @@ class JustB2B_Related_Products {
 
 		wp_send_json_success( [ 'html' => $html ] );
 	}
-
-	public function update_cart_item_price( $cart ) {
-		foreach ( $cart->get_cart() as $key => $item ) {
-			if ( isset( $item['locked_quantity'] ) && $item['quantity'] !== $item['locked_quantity'] ) {
-				$cart->set_quantity( $key, $item['locked_quantity'], false );
-			}
-
-			if ( ! isset( $item['extra_product_id'] ) ) {
-				continue;
-			}
-
-			$related_id = $item['extra_product_id'];
-			$related_product = wc_get_product( $related_id );
-			if ( ! $related_product ) {
-				continue;
-			}
-
-			$quantity = max( 1, $item['quantity'] );
-			$is_free = false;
-
-			foreach ( $this->related_products as $related ) {
-				if ( $related['id'] === $related_id ) {
-					if ( isset( $related['free'] ) && $quantity >= $related['free'] ) {
-						$is_free = true;
-					}
-					break;
-				}
-			}
-
-			$unit_addon = $is_free ? 0 : ( $related_product->get_price() / $quantity );
-			$current_price = $item['data']->get_price();
-			$item['data']->set_price( $current_price + $unit_addon );
-		}
-	}
 }
 
 JustB2B_Related_Products::get_instance();
-?>
