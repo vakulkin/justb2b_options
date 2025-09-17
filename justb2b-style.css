@@ -1,0 +1,408 @@
+/* JustB2B Quantity Buttons - Professional Styling */
+
+/* ==========================================================================
+   CSS Variables for Consistent Theming
+   ========================================================================== */
+
+:root {
+    --j2b-primary-color: #000000;
+    --j2b-primary-hover: #333333;
+    --j2b-primary-active: #000000;
+    --j2b-text-light: #ffffff;
+    --j2b-text-dark: #374151;
+    --j2b-border-color: #d1d5db;
+    --j2b-border-hover: #9ca3af;
+    --j2b-background-default: #f9fafb;
+    --j2b-background-hover: #f3f4f6;
+    --j2b-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --j2b-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --j2b-transition: none;
+    --j2b-border-radius: 4px;
+    --j2b-border-radius-lg: 8px;
+    --j2b-spacing-xs: 4px;
+    --j2b-spacing-sm: 6px;
+    --j2b-spacing-md: 8px;
+    --j2b-spacing-lg: 10px;
+    --j2b-spacing-xl: 12px;
+    --j2b-spacing-2xl: 16px;
+}
+
+/* ==========================================================================
+   Quantity Buttons
+   ========================================================================== */
+
+.quantity-buttons {
+    margin-top: var(--j2b-spacing-xl);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--j2b-spacing-sm);
+    align-items: center;
+}
+
+/* ==========================================================================
+   Quantity Button Base Styles
+   ========================================================================== */
+
+.qty-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--j2b-spacing-sm) var(--j2b-spacing-xl);
+    min-width: 36px;
+    min-height: 28px;
+    border: 1px solid var(--j2b-border-color);
+    border-radius: var(--j2b-border-radius);
+    background-color: var(--j2b-background-default);
+    color: var(--j2b-text-dark);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--j2b-transition);
+    box-shadow: var(--j2b-shadow-sm);
+    user-select: none;
+    -webkit-appearance: none;
+    appearance: none;
+    outline: none;
+
+    /* State variations */
+    &:hover {
+        background-color: var(--j2b-background-hover);
+        border-color: var(--j2b-border-hover);
+        box-shadow: var(--j2b-shadow-md);
+        transform: translateY(-1px);
+    }
+
+    &:focus {
+        outline: 2px solid var(--j2b-primary-color);
+        outline-offset: 2px;
+        box-shadow: var(--j2b-shadow-md), 0 0 0 2px rgba(0, 0, 0, 0.2);
+    }
+
+    &:active {
+        transform: translateY(0);
+        box-shadow: var(--j2b-shadow-sm);
+    }
+
+    &.active {
+        background-color: var(--j2b-primary-color);
+        border-color: var(--j2b-primary-active);
+        color: var(--j2b-text-light);
+        box-shadow: var(--j2b-shadow-md);
+        font-weight: 600;
+
+        &:hover {
+            background-color: var(--j2b-primary-hover);
+            border-color: var(--j2b-primary-active);
+        }
+
+        &:focus {
+            outline-color: var(--j2b-primary-color);
+            box-shadow: var(--j2b-shadow-md), 0 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+    }
+
+    &.loading {
+        opacity: 0.7;
+        pointer-events: none;
+
+        &::after {
+            content: '';
+            position: absolute;
+            width: var(--j2b-spacing-xl);
+            height: var(--j2b-spacing-xl);
+            margin: auto;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+    }
+}
+
+/* ==========================================================================
+   Related Products Options Styling
+   ========================================================================== */
+
+#justb2b_related_products_list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--j2b-spacing-sm);
+    border: none;
+    padding: 0;
+    margin-top: var(--j2b-spacing-2xl);
+}
+
+/* ==========================================================================
+   Product Option Labels
+   ========================================================================== */
+
+#justb2b_related_products_list label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--j2b-spacing-sm);
+    border: 1px solid var(--j2b-border-color);
+    padding: var(--j2b-spacing-sm);
+    cursor: pointer;
+    border-radius: var(--j2b-border-radius-lg);
+    background-color: var(--j2b-background-default);
+    transition: var(--j2b-transition);
+    box-shadow: var(--j2b-shadow-sm);
+    flex: 1 1 calc(20% - 6px);
+    min-width: 100px;
+    max-width: calc(20% - 6px);
+    position: relative;
+
+    &:hover {
+        border-color: var(--j2b-border-hover);
+        background-color: var(--j2b-background-hover);
+        box-shadow: var(--j2b-shadow-md);
+        transform: translateY(-2px);
+    }
+
+    /* Hidden radio input */
+    input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Product image */
+    img {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: var(--j2b-border-radius);
+        border: 1px solid var(--j2b-border-color);
+        flex-shrink: 0;
+        padding: 0;
+        margin: 0;
+        align-self: center;
+    }
+
+    /* Product info */
+    span {
+        flex: 1;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--j2b-text-dark);
+        line-height: 1.3;
+        word-wrap: break-word;
+        text-align: center;
+        width: 100%;
+
+        .woocommerce-Price-amount {
+            color: var(--j2b-primary-color);
+            font-weight: 600;
+            font-size: 12px;
+            display: block;
+            margin-top: var(--j2b-spacing-xs);
+        }
+    }
+
+    /* Selected state styling */
+    &:has(input[type="radio"]:checked) {
+        border-color: var(--j2b-primary-color);
+        background-color: rgba(0, 0, 0, 0.05);
+        box-shadow: var(--j2b-shadow-md), 0 0 0 2px rgba(0, 0, 0, 0.1);
+
+        &::before {
+            content: '';
+            position: absolute;
+            top: var(--j2b-spacing-sm);
+            left: var(--j2b-spacing-sm);
+            width: 20px;
+            height: 20px;
+            background-color: var(--j2b-primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 1;
+        }
+
+        &::after {
+            content: '✓';
+            position: absolute;
+            top: var(--j2b-spacing-sm);
+            left: var(--j2b-spacing-sm);
+            width: 20px;
+            height: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+    }
+}
+
+/* ==========================================================================
+   Animations
+   ========================================================================== */
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .quantity-buttons {
+        gap: var(--j2b-spacing-xs);
+    }
+
+    .qty-button {
+        padding: var(--j2b-spacing-xs) var(--j2b-spacing-md);
+        min-width: 32px;
+        min-height: 24px;
+        font-size: 11px;
+    }
+
+    #justb2b_related_products_list {
+        gap: var(--j2b-spacing-xs);
+    }
+
+    #justb2b_related_products_list label {
+        flex: 1 1 calc(33.333% - 3px);
+        min-width: 90px;
+        max-width: calc(33.333% - 3px);
+        padding: var(--j2b-spacing-sm);
+        gap: var(--j2b-spacing-xs);
+    }
+
+    #justb2b_related_products_list label img {
+        width: 50px;
+        height: 50px;
+    }
+
+    #justb2b_related_products_list label span {
+        font-size: 10px;
+    }
+
+    #justb2b_related_products_list label span .woocommerce-Price-amount {
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    #justb2b_related_products_list label {
+        flex: 1 1 calc(50% - 3px);
+        max-width: calc(50% - 3px);
+        min-width: 90px;
+        padding: var(--j2b-spacing-xs);
+        gap: var(--j2b-spacing-sm);
+    }
+
+    #justb2b_related_products_list label img {
+        width: 45px;
+        height: 45px;
+        padding: 0;
+        margin: 0;
+    }
+
+    #justb2b_related_products_list label span {
+        font-size: 9px;
+    }
+
+    #justb2b_related_products_list label span .woocommerce-Price-amount {
+        font-size: 10px;
+    }
+}
+
+/* ==========================================================================
+   Add to Cart Button Styling
+   ========================================================================== */
+
+.single_add_to_cart_button,
+button[type="submit"].single_add_to_cart_button {
+    width: 100% !important;
+    min-height: 50px !important;
+    padding: var(--j2b-spacing-lg) var(--j2b-spacing-2xl) !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    border-radius: var(--j2b-border-radius-lg) !important;
+    background-color: var(--j2b-primary-color) !important;
+    color: var(--j2b-text-light) !important;
+    border: 2px solid var(--j2b-primary-color) !important;
+    cursor: pointer !important;
+    transition: var(--j2b-transition) !important;
+    box-shadow: var(--j2b-shadow-md) !important;
+    margin-top: var(--j2b-spacing-xl) !important;
+    display: inline-block !important;
+
+    &:hover {
+        background-color: var(--j2b-primary-hover) !important;
+        border-color: var(--j2b-primary-hover) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 16px -2px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    &:active {
+        transform: translateY(0) !important;
+        box-shadow: var(--j2b-shadow-md) !important;
+    }
+
+    &:focus {
+        outline: 2px solid var(--j2b-primary-color) !important;
+        outline-offset: 2px !important;
+        box-shadow: var(--j2b-shadow-md), 0 0 0 2px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    &.loading {
+        opacity: 0.7 !important;
+        pointer-events: none !important;
+        position: relative !important;
+
+        &::after {
+            content: '' !important;
+            position: absolute !important;
+            width: 20px !important;
+            height: 20px !important;
+            margin: auto !important;
+            border: 2px solid transparent !important;
+            border-top-color: currentColor !important;
+            border-radius: 50% !important;
+            animation: spin 1s linear infinite !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+        }
+    }
+}
+
+/* Responsive adjustments for add to cart button */
+@media (max-width: 768px) {
+    .single_add_to_cart_button,
+    button[type="submit"].single_add_to_cart_button {
+        min-height: 45px !important;
+        padding: var(--j2b-spacing-md) var(--j2b-spacing-lg) !important;
+        font-size: 13px !important;
+        margin-top: var(--j2b-spacing-lg) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .single_add_to_cart_button,
+    button[type="submit"].single_add_to_cart_button {
+        min-height: 40px !important;
+        padding: var(--j2b-spacing-sm) var(--j2b-spacing-md) !important;
+        font-size: 12px !important;
+        margin-top: var(--j2b-spacing-md) !important;
+    }
+}
