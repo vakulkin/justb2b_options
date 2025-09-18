@@ -27,7 +27,7 @@ class JustB2B_Related_Products
      */
     private function __construct()
     {
-        $this->target_category = apply_filters('justb2b_target_category', 'parfumy');
+        $this->target_category = apply_filters('justb2b_target_category', 'rozpyv');
         $this->related_products = apply_filters('justb2b_related_products', [
             [ 'id' => 140, 'min' => 2, 'max' => 50, 'free' => 5 ],
             [ 'id' => 142, 'min' => 2, 'max' => 10 ],
