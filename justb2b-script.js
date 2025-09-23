@@ -39,61 +39,37 @@ jQuery(function($) {
     updateActive(parseInt($qtyInput.val(), 10));
 
     // Quantity input change handler
-    $qtyInput.on('input change', function() {
-        const qty = parseInt($(this).val(), 10);
-        updateActive(qty);
-        debouncedUpdate();
-    });
-
-    let isRequestInProgress = false;
-
-    function updateRelatedProducts() {
-        if (isRequestInProgress) return;
-
-        const qty = parseInt($qtyInput.val(), 10);
-        const productId = parseInt($container.data("product-id"), 10);
-        const selectedOption = $radioInputs.filter(':checked').val() || null;
-
-        if (!qty || !productId) return;
-
-        isRequestInProgress = true;
-        $radioContainer.css({ opacity: 0.5, 'pointer-events': 'none' });
-
-        $.ajax({
-            url: justb2b_data.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'justb2b_update_related_products',
-                nonce: justb2b_data.nonce,
-                qty: qty,
-                product_id: productId,
-                selected_option: selectedOption
-            },
-            success: function(response) {
-                if (response.success) {
-                    $container.html(response.data.html);
-                } else {
-                    $container.html("<p>Error loading options.</p>");
-                }
-            },
-            error: function() {
-                $container.html("<p>Error loading options.</p>");
-            },
-            complete: function() {
-                isRequestInProgress = false;
-                $radioContainer.css({ opacity: '', 'pointer-events': '' });
-            }
+        $qtyInput.on('input change', function() {
+            const qty = parseInt($(this).val(), 10);
+            updateActive(qty);
+            renderRelatedProducts(qty);
         });
-    }
 
-    // Improved debounce function
-    function debounce(func, delay) {
-        let timeoutId;
-        return function(...args) {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => func.apply(this, args), delay);
-        };
-    }
+        // Initial render
+        renderRelatedProducts(parseInt($qtyInput.val(), 10));
 
-    const debouncedUpdate = debounce(updateRelatedProducts, 300);
+        function renderRelatedProducts(qty) {
+            const validProducts = justb2b_data.related_products.filter(rel =>
+                qty >= rel.min && qty <= rel.max
+            );
+
+            if (!validProducts.length) {
+                $radioContainer.html("<p>No valid options.</p>");
+                return;
+            }
+
+            // Default to first valid option if none selected
+            let selectedOption = $radioContainer.find('input[name="extra_option"]:checked').val() || validProducts[0].id;
+
+            $radioContainer.html(validProducts.map(rel => {
+                let displayPrice = (rel.free && qty >= rel.free) ? 'В подарунок' : rel.formatted_price;
+                return `
+                <label>
+                    <input type="radio" name="extra_option" value="${rel.id}" ${rel.id == selectedOption ? 'checked' : ''} required>
+                    <img src="${rel.image}" alt="${rel.name}">
+                    <span>${rel.name}</span><br><strong>${displayPrice}</strong>
+                </label>
+            `;
+            }).join(''));
+        }
 });
