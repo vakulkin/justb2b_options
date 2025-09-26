@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Plugin Name: JustB2B Options
  * Description: Adds related product options as radio buttons on WooCommerce product pages and applies extra product prices as fees.
@@ -18,9 +17,7 @@ class JustB2B_Related_Products
     private $target_category;
     private $selectors = [
         'qtyInput' => ".cart .quantity input.qty",
-        'relatedProductsContainer' => "#justb2b_related_products_container",
         'radioContainer' => "#justb2b_related_products_list",
-        'radioInputs' => "input[name='extra_option']"
     ];
 
     /**
@@ -148,13 +145,15 @@ class JustB2B_Related_Products
             $checked = ($related['id'] === $selected_option) ? 'checked' : '';
             $input_id = 'extra_option_' . $related['id'];
             $price = $this->get_flacon_price($related, $quantity);
-            $price_display = ($price == 0) ? 'В подарунок' : wc_price($price);
+
+            $price_display = ($price == 0) ? 'Безкоштовно' : wc_price($price);
 
             $html .= sprintf(
-                '<label for="%1$s" class="justb2b-option-card">
+                '<label for="%1$s">
                     <input type="radio" id="%1$s" name="extra_option" value="%2$d" %3$s required>
                     <img src="%4$s" alt="%5$s">
-                    <span>%5$s</span><br><strong>%6$s</strong>
+                    <span>%5$s</span>
+                    <strong>%6$s</strong>
                 </label>',
                 esc_attr($input_id),
                 $related['id'],
@@ -388,34 +387,29 @@ class JustB2B_Related_Products
         $min_max = $this->get_min_max_values($product->get_id());
         $quantities = range($min_max['min'], $min_max['max']);
 
-        // Prepare simplified related products data for JS
-        $related_products_data = [];
-        foreach ($this->related_products as $rel) {
-            $prod = wc_get_product($rel['id']);
-            if ($prod) {
-                $related_products_data[] = [
-                    'id'    => $rel['id'],
-                    'name'  => $prod->get_name(),
-                    'price' => (float) $prod->get_price(),
-                    'formatted_price' => strip_tags(wc_price($prod->get_price())),
-                    'formatted_free_price' => strip_tags(wc_price(0)),
-                    'min'   => $rel['min'] ?? 1,
-                    'max'   => $rel['max'] ?? 100,
-                    'free'  => $rel['free'] ?? null,
-                    'image' => get_the_post_thumbnail_url($rel['id'], 'woocommerce_thumbnail') ?: wc_placeholder_img_src()
-                ];
-            }
-        }
+        $related_products_data = array_map(function($rel) {
+            $product = wc_get_product($rel['id']);
+            return [
+                'id' => $rel['id'],
+                'min' => $rel['min'] ?? 0,
+                'max' => $rel['max'] ?? PHP_INT_MAX,
+                'free' => $rel['free'] ?? null,
+                'name' => $product ? $product->get_name() : '',
+                'image' => get_the_post_thumbnail_url($rel['id'], 'woocommerce_thumbnail') ?: wc_placeholder_img_src(),
+                'formatted_price' => $product ? wc_price($product->get_price()) : ''
+            ];
+        }, $this->related_products);
 
         wp_enqueue_style('justb2b-style', plugin_dir_url(__FILE__) . 'justb2b-style.css', [], '1.0.0');
         wp_enqueue_script('justb2b-script', plugin_dir_url(__FILE__) . 'justb2b-script.js', ['jquery'], '1.0.0', true);
 
         wp_localize_script('justb2b-script', 'justb2b_data', [
             'quantities' => $quantities,
-            'related_products' => $related_products_data,
-            'selectors' => $this->selectors
+            'selectors' => $this->selectors,
+            'related_products' => $related_products_data
         ]);
     }
 }
 
 JustB2B_Related_Products::get_instance();
+?>
