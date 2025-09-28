@@ -297,7 +297,7 @@ class JustB2B_Related_Products {
 
 		// Add aggregated fees with count
 		foreach ( $fees as $flacon_name => $fee_data ) {
-			$fee_name = sprintf( __( 'Флакон: %s x %d', 'justb2b' ), $flacon_name, $fee_data['count'] );
+			$fee_name = sprintf( __( '%s x %d', 'justb2b' ), $flacon_name, $fee_data['count'] );
 			$cart->add_fee( $fee_name, $fee_data['price'] );
 		}
 	}
