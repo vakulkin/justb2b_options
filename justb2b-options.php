@@ -127,7 +127,7 @@ class JustB2B_Related_Products
     public function display_related_products()
     {
         global $product;
-        if (! $product) {
+        if (! is_object($product) || ! $product instanceof WC_Product) {
             return;
         }
 
@@ -255,7 +255,7 @@ class JustB2B_Related_Products
         if (isset($values['justb2b_extra_option'])) {
             $extra_id = $values['justb2b_extra_option'];
             $product = wc_get_product($extra_id);
-            if ($product) {
+            if (is_object($product) && $product instanceof WC_Product) {
                 $related_data = $this->get_related_data_by_id($extra_id);
                 $quantity = $values['quantity'] ?? 1;
                 $price = $related_data ? $this->get_flacon_price($related_data, $quantity) : 0.0;
@@ -448,7 +448,7 @@ class JustB2B_Related_Products
     public function enqueue_scripts()
     {
         global $product;
-        if (! $product || ! $this->is_eligible_product($product->get_id())) {
+        if (! is_object($product) || ! $product instanceof WC_Product || ! $this->is_eligible_product($product->get_id())) {
             return;
         }
 
